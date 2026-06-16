@@ -1,4 +1,4 @@
-// @title        HomeMatch CRM API
+// @title        Nearby CRM API
 // @version      1.0
 // @description  CRM для агентств недвижимости — подбор объектов по инфраструктуре, Match Score, воронка сделок
 // @host         localhost:8080
@@ -41,7 +41,7 @@ func main() {
 	services.StartAutomation(db)
 
 	r := router.New(db, cfg)
-	log.Printf("HomeMatch CRM listening on :%s", cfg.Port)
+	log.Printf("Nearby CRM listening on :%s", cfg.Port)
 	log.Printf("Swagger: http://localhost:%s/swagger/index.html", cfg.Port)
 
 	if err := r.Run(":" + cfg.Port); err != nil {

@@ -1,8 +1,14 @@
 package handlers
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/homematch/crm/internal/config"
@@ -57,6 +63,7 @@ func (h *PropertiesHandler) Create(c *gin.Context) {
 		prop.PricePerM2 = prop.Price / prop.Area
 	}
 	h.db.Create(&prop)
+	go scanPropertyForMatches(h.db, h.cfg, prop)
 	c.JSON(http.StatusCreated, prop)
 }
 
@@ -91,12 +98,98 @@ func (h *PropertiesHandler) Update(c *gin.Context) {
 
 func (h *PropertiesHandler) Delete(c *gin.Context) {
 	orgID := c.MustGet("organization_id").(uint)
-	result := h.db.Where("id = ? AND organization_id = ?", c.Param("id"), orgID).Delete(&models.Property{})
-	if result.RowsAffected == 0 {
+
+	var prop models.Property
+	if err := h.db.Where("id = ? AND organization_id = ?", c.Param("id"), orgID).First(&prop).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+
+	h.db.Where("property_id = ? AND organization_id = ?", prop.ID, orgID).Delete(&models.Deal{})
+	h.db.Where("property_id = ?", prop.ID).Delete(&models.Booking{})
+	h.db.Where("property_id = ?", prop.ID).Delete(&models.Notification{})
+
+	if err := h.db.Delete(&prop).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot delete property: " + err.Error()})
+		return
+	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *PropertiesHandler) UploadPhotos(c *gin.Context) {
+	orgID := c.MustGet("organization_id").(uint)
+	var prop models.Property
+	if err := h.db.Where("id = ? AND organization_id = ?", c.Param("id"), orgID).First(&prop).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+
+	form, err := c.MultipartForm()
+	if err != nil || len(form.File["photos"]) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no files"})
+		return
+	}
+
+	if err := os.MkdirAll(h.cfg.UploadDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot create upload dir"})
+		return
+	}
+
+	for _, header := range form.File["photos"] {
+		file, err := header.Open()
+		if err != nil {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(header.Filename))
+		if ext == "" {
+			ext = ".jpg"
+		}
+		filename := fmt.Sprintf("prop_%d_%d%s", prop.ID, time.Now().UnixNano(), ext)
+		dst, err := os.Create(filepath.Join(h.cfg.UploadDir, filename))
+		if err != nil {
+			file.Close()
+			continue
+		}
+		io.Copy(dst, file)
+		file.Close()
+		dst.Close()
+		prop.Photos = append(prop.Photos, "/uploads/"+filename)
+	}
+
+	h.db.Save(&prop)
+	c.JSON(http.StatusOK, gin.H{"photos": prop.Photos})
+}
+
+func (h *PropertiesHandler) DeletePhoto(c *gin.Context) {
+	orgID := c.MustGet("organization_id").(uint)
+	var prop models.Property
+	if err := h.db.Where("id = ? AND organization_id = ?", c.Param("id"), orgID).First(&prop).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+
+	var body struct {
+		URL string `json:"url"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.URL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "url required"})
+		return
+	}
+
+	updated := make([]string, 0, len(prop.Photos))
+	for _, p := range prop.Photos {
+		if p != body.URL {
+			updated = append(updated, p)
+		}
+	}
+	prop.Photos = updated
+	h.db.Save(&prop)
+
+	if strings.HasPrefix(body.URL, "/uploads/") {
+		os.Remove(filepath.Join(h.cfg.UploadDir, strings.TrimPrefix(body.URL, "/uploads/")))
+	}
+
+	c.JSON(http.StatusOK, gin.H{"photos": prop.Photos})
 }
 
 func (h *PropertiesHandler) Nearby(c *gin.Context) {

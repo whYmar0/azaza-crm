@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Users, Building2, Handshake, Star, LogOut, Instagram, Home } from 'lucide-react'
+import { LayoutDashboard, Users, Building2, Handshake, Star, LogOut, Instagram, MessageCircle, Home } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import NotificationBell from './NotificationBell'
 
 const nav = [
   { to: '/dashboard', label: 'Дашборд',  icon: LayoutDashboard },
@@ -9,6 +10,7 @@ const nav = [
   { to: '/deals',     label: 'Сделки',   icon: Handshake },
   { to: '/selections',label: 'Подборки', icon: Star },
   { to: '/instagram', label: 'Instagram', icon: Instagram },
+  { to: '/whatsapp',  label: 'WhatsApp', icon: MessageCircle },
 ]
 
 export default function Sidebar() {
@@ -27,10 +29,11 @@ export default function Sidebar() {
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
             <Home className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <div className="text-[13px] font-bold text-slate-900 leading-tight">HomeMatch</div>
+          <div className="flex-1">
+            <div className="text-[13px] font-bold text-slate-900 leading-tight">Nearby</div>
             <div className="text-[10px] text-slate-400 font-medium tracking-wide uppercase">CRM</div>
           </div>
+          <NotificationBell />
         </div>
       </div>
 

@@ -17,7 +17,12 @@ services:
       - "5432:5432"
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        HTTP_PROXY: http://host.docker.internal:10809
+        HTTPS_PROXY: http://host.docker.internal:10809
+        NO_PROXY: localhost,127.0.0.1,postgres
     depends_on:
       postgres:
         condition: service_healthy

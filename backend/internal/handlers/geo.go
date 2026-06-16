@@ -30,7 +30,7 @@ func (h *GeoHandler) Suggest(c *gin.Context) {
 	}
 
 	endpoint := fmt.Sprintf(
-		"https://suggest-maps.2gis.com/v1/suggest?q=%s&key=%s&location=45.6987,43.3169&type=building,street,attraction&fields=items.point&page_size=7",
+		"https://catalog.api.2gis.com/3.0/suggests?q=%s&key=%s&fields=items.point,items.full_name,items.address_name&viewpoint1=45.5,43.4&viewpoint2=45.9,43.2&page_size=7",
 		url.QueryEscape(q), h.cfg.TwoGISKey,
 	)
 

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -68,7 +69,7 @@ func (h *PublicHandler) CreateLead(c *gin.Context) {
 		ClientID:  client.ID,
 		Channel:   "api",
 		Direction: "in",
-		Text:      "Лид создан через публичный API" + func() string {
+		Text: "Лид создан через публичный API" + func() string {
 			if body.Notes != "" {
 				return ": " + body.Notes
 			}
@@ -84,6 +85,56 @@ func (h *PublicHandler) CreateLead(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusCreated, client)
+}
+
+type importResult struct {
+	Index int    `json:"index"`
+	ID    uint   `json:"id,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+
+func (h *PublicHandler) ImportProperties(c *gin.Context) {
+	orgID := c.MustGet("organization_id").(uint)
+
+	body, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot read body"})
+		return
+	}
+
+	var items []models.Property
+	if err := json.Unmarshal(body, &items); err != nil {
+		var single models.Property
+		if err2 := json.Unmarshal(body, &single); err2 != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON: expected a property object or an array of properties"})
+			return
+		}
+		items = []models.Property{single}
+	}
+
+	results := make([]importResult, 0, len(items))
+	for i, prop := range items {
+		prop.ID = 0
+		prop.OrganizationID = orgID
+		if prop.Title == "" || prop.Type == "" {
+			results = append(results, importResult{Index: i, Error: "title and type are required"})
+			continue
+		}
+		if prop.Status == "" {
+			prop.Status = "free"
+		}
+		if prop.Area > 0 && prop.Price > 0 {
+			prop.PricePerM2 = prop.Price / prop.Area
+		}
+		if err := h.db.Create(&prop).Error; err != nil {
+			results = append(results, importResult{Index: i, Error: err.Error()})
+			continue
+		}
+		go scanPropertyForMatches(h.db, h.cfg, prop)
+		results = append(results, importResult{Index: i, ID: prop.ID})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"imported": results})
 }
 
 func (h *PublicHandler) GetSelection(c *gin.Context) {

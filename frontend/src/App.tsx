@@ -12,6 +12,7 @@ import Deals from './screens/Deals'
 import Selections from './screens/Selections'
 import PublicSelection from './screens/PublicSelection'
 import InstagramPage from './screens/Instagram'
+import WhatsAppPage from './screens/WhatsApp'
 
 function Guard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -54,6 +55,7 @@ export default function App() {
                     <Route path="deals" element={<Deals />} />
                     <Route path="selections" element={<Selections />} />
                     <Route path="instagram" element={<InstagramPage />} />
+                    <Route path="whatsapp" element={<WhatsAppPage />} />
                   </Routes>
                 </Layout>
               </Guard>

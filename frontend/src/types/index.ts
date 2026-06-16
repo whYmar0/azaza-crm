@@ -50,6 +50,7 @@ export interface Property {
   promo: string
   status: 'free' | 'booked' | 'sold'
   cover_url: string
+  photos: string[]
   description: string
   tags: string[]
   created_at: string
@@ -119,6 +120,19 @@ export interface MatchResult {
 export interface MatchItem {
   property: Property
   match: MatchResult
+}
+
+export interface Notification {
+  id: number
+  organization_id: number
+  client_id: number
+  property_id: number
+  score: number
+  message: string
+  read: boolean
+  created_at: string
+  client?: Client
+  property?: Property
 }
 
 export interface ApiKey {

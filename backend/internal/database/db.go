@@ -34,6 +34,9 @@ func Migrate(db *gorm.DB) {
 		&models.ApiKey{},
 		&models.WebhookSubscription{},
 		&models.AutomationRule{},
+		&models.InstagramIntegration{},
+		&models.WhatsAppIntegration{},
+		&models.Notification{},
 	)
 	if err != nil {
 		log.Fatalf("migration failed: %v", err)

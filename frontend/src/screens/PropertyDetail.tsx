@@ -5,7 +5,7 @@ import type { NearbyPlace, Property } from '../types'
 import StatusPill from '../components/StatusPill'
 import MapPanel from '../components/MapPanel'
 import Calculator from '../components/Calculator'
-import { ArrowLeft, Layers, Calendar, CreditCard, MapPin, Upload, Sparkles, Tag, X, Pencil, Check, LocateFixed } from 'lucide-react'
+import { ArrowLeft, Layers, Calendar, CreditCard, MapPin, Upload, Sparkles, Tag, X, Pencil, Check, LocateFixed, Plus, Trash2 } from 'lucide-react'
 
 const TWOGIS_KEY = 'adca2f24-661a-4a2a-a21c-8784c14c8765'
 
@@ -16,19 +16,25 @@ function fmtPrice(p: Property) {
 
 interface Suggestion {
   id: string; full_name: string; name: string
-  point?: { lat: number; lon: number }
+  lat?: number; lon?: number
 }
 
-function AddressAutocomplete({ value, onChange, onSelect }: {
+function AddressAutocomplete({ value, onChange, onSelect, onAutoFill }: {
   value: string
   onChange: (v: string) => void
   onSelect: (address: string, lat: number, lng: number) => void
+  onAutoFill?: (lat: number, lng: number) => void
 }) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const selectedRef = useRef(false)
+  const suggestionsRef = useRef<Suggestion[]>([])
+  const requestIdRef = useRef(0)
+
+  useEffect(() => { suggestionsRef.current = suggestions }, [suggestions])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -40,7 +46,9 @@ function AddressAutocomplete({ value, onChange, onSelect }: {
 
   const search = (q: string) => {
     onChange(q)
+    selectedRef.current = false
     if (timer.current) clearTimeout(timer.current)
+    const requestId = ++requestIdRef.current
     if (q.length < 3) { setSuggestions([]); setOpen(false); return }
     timer.current = setTimeout(async () => {
       setLoading(true)
@@ -50,18 +58,32 @@ function AddressAutocomplete({ value, onChange, onSelect }: {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         })
         const data = await res.json()
+        if (requestId !== requestIdRef.current) return
         const items: Suggestion[] = data.items ?? []
         setSuggestions(items)
         setOpen(items.length > 0)
+        if (items.length > 0 && items[0].lat != null && items[0].lon != null && onAutoFill) {
+          onAutoFill(items[0].lat, items[0].lon)
+        }
       } catch { setSuggestions([]) }
       finally { setLoading(false) }
     }, 350)
   }
 
   const pick = (s: Suggestion) => {
+    selectedRef.current = true
     const addr = s.full_name || s.name
     onChange(addr); setOpen(false); setSuggestions([])
-    if (s.point) onSelect(addr, s.point.lat, s.point.lon)
+    if (s.lat != null && s.lon != null) onSelect(addr, s.lat, s.lon)
+  }
+
+  const handleBlur = () => {
+    setTimeout(() => {
+      setOpen(false)
+      if (!selectedRef.current && suggestionsRef.current.length > 0) {
+        pick(suggestionsRef.current[0])
+      }
+    }, 200)
   }
 
   return (
@@ -69,8 +91,11 @@ function AddressAutocomplete({ value, onChange, onSelect }: {
       <div className="relative">
         <input required value={value} onChange={e => search(e.target.value)}
           onFocus={() => suggestions.length > 0 && setOpen(true)}
+          onBlur={handleBlur}
           className="w-full border border-slate-300 rounded-md px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="г. Грозный, ул. Путина, 1" autoComplete="off" />
+          placeholder="г. Грозный, ул. Путина, 1"
+          name="address-2gis-search" autoComplete="off" autoCorrect="off" spellCheck="false"
+          data-lpignore="true" data-1p-ignore />
         {loading && <div className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />}
       </div>
       {open && suggestions.length > 0 && (
@@ -103,6 +128,11 @@ function PropertyForm({ onCreated }: { onCreated: (id: number) => void }) {
 
   const handleAddressSelect = (address: string, lat: number, lng: number) => {
     setForm(f => ({ ...f, address, lat: lat.toFixed(6), lng: lng.toFixed(6) }))
+    setCoordsFromMap(true)
+  }
+
+  const handleAutoFill = (lat: number, lng: number) => {
+    setForm(f => ({ ...f, lat: lat.toFixed(6), lng: lng.toFixed(6) }))
     setCoordsFromMap(true)
   }
 
@@ -142,7 +172,7 @@ function PropertyForm({ onCreated }: { onCreated: (id: number) => void }) {
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Адрес <span className="ml-1 text-xs font-normal text-indigo-500">— начните вводить, выберите из 2ГИС</span>
             </label>
-            <AddressAutocomplete value={form.address} onChange={v => set('address', v)} onSelect={handleAddressSelect} />
+            <AddressAutocomplete value={form.address} onChange={v => set('address', v)} onSelect={handleAddressSelect} onAutoFill={handleAutoFill} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Тип</label>
@@ -245,6 +275,63 @@ function CoverUpload({ property, onUploaded }: { property: Property; onUploaded:
         {uploading ? 'Загрузка...' : 'Изменить фото'}
       </button>
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+    </div>
+  )
+}
+
+function PhotoGallery({ property, onChange }: { property: Property; onChange: (p: Property) => void }) {
+  const [uploading, setUploading] = useState(false)
+  const [deletingUrl, setDeletingUrl] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const photos = property.photos ?? []
+
+  const handleFiles = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    setUploading(true)
+    try {
+      const res = await propertiesApi.uploadPhotos(property.id, files)
+      onChange({ ...property, photos: res.photos })
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  const handleDelete = async (url: string) => {
+    setDeletingUrl(url)
+    try {
+      const res = await propertiesApi.deletePhoto(property.id, url)
+      onChange({ ...property, photos: res.photos })
+    } finally { setDeletingUrl(null) }
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-slate-900">Фотографии</h3>
+        <button onClick={() => inputRef.current?.click()} disabled={uploading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+          <Plus className="w-3.5 h-3.5" />
+          {uploading ? 'Загрузка...' : 'Добавить фото'}
+        </button>
+        <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
+      </div>
+      {photos.length === 0 ? (
+        <div className="text-sm text-slate-400 text-center py-6">Нет фотографий</div>
+      ) : (
+        <div className="grid grid-cols-4 gap-3">
+          {photos.map(url => (
+            <div key={url} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200">
+              <img src={url} alt="" className="w-full h-full object-cover" />
+              <button onClick={() => handleDelete(url)} disabled={deletingUrl === url}
+                className="absolute top-1.5 right-1.5 p-1.5 bg-black/60 text-white rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-opacity disabled:opacity-50">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -396,6 +483,9 @@ export default function PropertyDetail() {
   const navigate = useNavigate()
   const [property, setProperty] = useState<Property | null>(null)
   const [nearby, setNearby] = useState<NearbyPlace[]>([])
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const isNew = id === 'new'
   const numId = isNew ? NaN : Number(id)
@@ -405,6 +495,19 @@ export default function PropertyDetail() {
     propertiesApi.get(numId).then(setProperty).catch(() => navigate('/properties'))
     propertiesApi.nearby(numId).then(setNearby).catch(() => {})
   }, [numId, isNew])
+
+  const deleteProperty = async () => {
+    if (isNaN(numId)) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await propertiesApi.delete(numId)
+      navigate('/properties')
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Не удалось удалить объект')
+      setDeleting(false)
+    }
+  }
 
   if (isNew) return <PropertyForm onCreated={newId => navigate(`/properties/${newId}`)} />
   if (!property) return <div className="text-slate-400 p-8 text-center">Загрузка...</div>
@@ -421,7 +524,29 @@ export default function PropertyDetail() {
           </div>
           <AddressEditor property={property} onChange={p => { setProperty(p); propertiesApi.nearby(p.id).then(setNearby).catch(() => {}) }} />
         </div>
+        {showDeleteConfirm ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-red-600">Удалить объект?</span>
+            <button onClick={deleteProperty} disabled={deleting}
+              className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors">
+              {deleting ? 'Удаление...' : 'Да'}
+            </button>
+            <button onClick={() => { setShowDeleteConfirm(false); setDeleteError('') }} disabled={deleting}
+              className="px-3 py-1.5 bg-slate-100 text-slate-700 text-sm rounded-md hover:bg-slate-200 transition-colors">Нет</button>
+          </div>
+        ) : (
+          <button onClick={() => setShowDeleteConfirm(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-red-600 border border-red-200 text-sm rounded-md hover:bg-red-50 transition-colors">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
+
+      {deleteError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-md px-4 py-2">
+          {deleteError}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-5">
         <div className="col-span-2 space-y-5">
@@ -467,6 +592,8 @@ export default function PropertyDetail() {
               )}
             </div>
           </div>
+
+          <PhotoGallery property={property} onChange={setProperty} />
 
           <DescriptionPanel property={property} onChange={setProperty} />
 

@@ -8,7 +8,7 @@ const docTemplate = `{
     "swagger": "2.0",
     "info": {
         "description": "CRM для агентств недвижимости — подбор объектов по инфраструктуре, Match Score, воронка сделок",
-        "title": "HomeMatch CRM API",
+        "title": "Nearby CRM API",
         "contact": {},
         "version": "1.0"
     },
@@ -35,7 +35,7 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8080",
 	BasePath:         "/",
 	Schemes:          []string{},
-	Title:            "HomeMatch CRM API",
+	Title:            "Nearby CRM API",
 	Description:      "CRM для агентств недвижимости",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,

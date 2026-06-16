@@ -1,4 +1,4 @@
-# HomeMatch CRM
+# Nearby CRM
 
 > «CRM, которая подбирает не квартиру, а образ жизни»
 
@@ -6,10 +6,14 @@ Hackathon MVP — CRM для агентств недвижимости с Match 
 
 ## Быстрый старт
 
-1. Получи ключ 2ГИС: https://dev.2gis.ru → Create Demo Key
-2. Скопируй `.env.example` → `.env`, вставь `TWOGIS_API_KEY`
+Нужен только Docker — Go-код собирается прямо внутри сборки контейнера.
+
+1. Получи ключ 2ГИС: https://dev.2gis.ru → Create Demo Key, и ключ Groq: https://console.groq.com
+2. Скопируй `.env.example` → `.env`, вставь `TWOGIS_API_KEY` и `GROQ_API_KEY`
 3. `make up`
 4. Открой http://localhost:3000
+
+Любое изменение кода backend подхватывается автоматически при следующем `make up` — пересобирать бинарник руками больше не нужно.
 
 **Логин:** `admin@homematch.dev` / `Admin1234!`
 

@@ -41,24 +41,25 @@ type Client struct {
 }
 
 type Property struct {
-	ID             uint     `gorm:"primaryKey" json:"id"`
-	OrganizationID uint     `gorm:"not null;index" json:"organization_id"`
-	Title          string   `gorm:"not null" json:"title"`
-	Type           string   `gorm:"not null" json:"type"`
-	Address        string   `json:"address"`
-	Lat            float64  `json:"lat"`
-	Lng            float64  `json:"lng"`
-	Area           float64  `json:"area"`
-	Rooms          int      `json:"rooms"`
-	Price          float64  `json:"price"`
-	PricePerM2     float64  `json:"price_per_m2"`
-	ReadyDate      string   `json:"ready_date"`
-	Installment    bool     `json:"installment"`
-	Promo          string   `json:"promo"`
-	Status         string   `gorm:"default:'free'" json:"status"`
-	CoverURL       string   `json:"cover_url"`
-	Description    string   `json:"description"`
-	Tags           []string `gorm:"serializer:json" json:"tags"`
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	OrganizationID uint      `gorm:"not null;index" json:"organization_id"`
+	Title          string    `gorm:"not null" json:"title"`
+	Type           string    `gorm:"not null" json:"type"`
+	Address        string    `json:"address"`
+	Lat            float64   `json:"lat"`
+	Lng            float64   `json:"lng"`
+	Area           float64   `json:"area"`
+	Rooms          int       `json:"rooms"`
+	Price          float64   `json:"price"`
+	PricePerM2     float64   `json:"price_per_m2"`
+	ReadyDate      string    `json:"ready_date"`
+	Installment    bool      `json:"installment"`
+	Promo          string    `json:"promo"`
+	Status         string    `gorm:"default:'free'" json:"status"`
+	CoverURL       string    `json:"cover_url"`
+	Photos         []string  `gorm:"serializer:json" json:"photos"`
+	Description    string    `json:"description"`
+	Tags           []string  `gorm:"serializer:json" json:"tags"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -124,6 +125,17 @@ type InstagramIntegration struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
+type WhatsAppIntegration struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	OrganizationID uint      `gorm:"not null;uniqueIndex" json:"organization_id"`
+	AccessToken    string    `json:"access_token"`
+	PhoneNumberID  string    `json:"phone_number_id"`
+	DisplayPhone   string    `json:"display_phone"`
+	VerifiedName   string    `json:"verified_name"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type ApiKey struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	OrganizationID uint      `gorm:"not null;index" json:"organization_id"`
@@ -141,6 +153,19 @@ type WebhookSubscription struct {
 	Events         []string  `gorm:"serializer:json" json:"events"`
 	Active         bool      `gorm:"default:true" json:"active"`
 	CreatedAt      time.Time `json:"created_at"`
+}
+
+type Notification struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	OrganizationID uint      `gorm:"not null;index" json:"organization_id"`
+	ClientID       uint      `json:"client_id"`
+	PropertyID     uint      `json:"property_id"`
+	Score          int       `json:"score"`
+	Message        string    `json:"message"`
+	Read           bool      `gorm:"default:false;index" json:"read"`
+	CreatedAt      time.Time `json:"created_at"`
+	Client         Client    `gorm:"foreignKey:ClientID" json:"client,omitempty"`
+	Property       Property  `gorm:"foreignKey:PropertyID" json:"property,omitempty"`
 }
 
 type AutomationRule struct {

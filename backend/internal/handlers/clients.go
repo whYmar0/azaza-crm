@@ -49,6 +49,7 @@ func (h *ClientsHandler) Create(c *gin.Context) {
 		client.Status = "new"
 	}
 	h.db.Create(&client)
+	go scanClientForMatches(h.db, h.cfg, client)
 	c.JSON(http.StatusCreated, client)
 }
 
@@ -95,7 +96,13 @@ func (h *ClientsHandler) Delete(c *gin.Context) {
 		h.db.Where("id IN ?", selIDs).Delete(&models.Selection{})
 	}
 	h.db.Where("client_id = ?", client.ID).Delete(&models.Interaction{})
-	h.db.Delete(&client)
+	h.db.Where("client_id = ? AND organization_id = ?", client.ID, orgID).Delete(&models.Deal{})
+	h.db.Where("client_id = ?", client.ID).Delete(&models.Notification{})
+
+	if err := h.db.Delete(&client).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot delete client: " + err.Error()})
+		return
+	}
 	c.Status(http.StatusNoContent)
 }
 

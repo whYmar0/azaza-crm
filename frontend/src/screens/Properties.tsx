@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { propertiesApi } from '../api/client'
 import type { Property } from '../types'
 import StatusPill from '../components/StatusPill'
-import { Plus, Home, Layers, SlidersHorizontal, X } from 'lucide-react'
+import { Plus, Home, Layers, SlidersHorizontal, X, Trash2 } from 'lucide-react'
 
 function fmtPrice(p: Property) {
   if (p.type === 'rent') return `${p.price.toLocaleString('ru-RU')} ₽/мес`
@@ -11,9 +11,9 @@ function fmtPrice(p: Property) {
 }
 
 const INFRA_TAGS = [
-  { key: 'парк', label: '🌳 Парк' },
-  { key: 'школа', label: '🏫 Школа' },
-  { key: 'детский сад', label: '🧸 Детский сад' },
+  { key: 'park', label: '🌳 Парк' },
+  { key: 'school', label: '🏫 Школа' },
+  { key: 'kinder', label: '🧸 Детский сад' },
 ]
 
 export default function Properties() {
@@ -28,6 +28,7 @@ export default function Properties() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     propertiesApi.list({
       status: statusFilter || undefined,
@@ -35,13 +36,21 @@ export default function Properties() {
       rooms: roomsFilter || undefined,
       price_min: priceMin ? Number(priceMin) : undefined,
       price_max: priceMax ? Number(priceMax) : undefined,
-    }).then(data => {
-      if (infraTags.length > 0) {
-        setProps(data.filter(p => infraTags.every(tag => (p.tags ?? []).some(t => t.toLowerCase().includes(tag)))))
-      } else {
-        setProps(data)
+    }).then(async data => {
+      if (infraTags.length === 0) {
+        if (!cancelled) setProps(data)
+        return
       }
-    }).finally(() => setLoading(false))
+      const checks = await Promise.all(data.map(async p => {
+        try {
+          const nearby = await propertiesApi.nearby(p.id)
+          const matches = infraTags.every(type => nearby.some(n => n.type === type && n.dist <= 1000))
+          return matches ? p : null
+        } catch { return null }
+      }))
+      if (!cancelled) setProps(checks.filter((p): p is Property => p !== null))
+    }).finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [statusFilter, typeFilter, roomsFilter, priceMin, priceMax, infraTags])
 
   const hasActiveFilters = roomsFilter > 0 || priceMin || priceMax || infraTags.length > 0
@@ -55,6 +64,18 @@ export default function Properties() {
 
   const toggleInfra = (tag: string) => {
     setInfraTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
+  }
+
+  const deleteProperty = async (e: MouseEvent, id: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!window.confirm('Удалить этот объект?')) return
+    try {
+      await propertiesApi.delete(id)
+      setProps(prev => prev.filter(p => p.id !== id))
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Не удалось удалить объект')
+    }
   }
 
   return (
@@ -150,7 +171,7 @@ export default function Properties() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-slate-400 mt-1">Фильтр по тегам, добавленным к объектам (через Groq AI)</p>
+            <p className="text-xs text-slate-400 mt-1">Показывает объекты, у которых выбранная инфраструктура реально есть в радиусе 1 км (данные 2ГИС)</p>
           </div>
         </div>
       )}
@@ -161,7 +182,11 @@ export default function Properties() {
         <div className="grid grid-cols-3 gap-4">
           {props.map(prop => (
             <Link key={prop.id} to={`/properties/${prop.id}`}
-              className="bg-white border border-slate-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+              className="group relative bg-white border border-slate-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+              <button onClick={e => deleteProperty(e, prop.id)}
+                className="absolute top-2 right-2 z-10 p-1.5 bg-black/50 text-white rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-opacity">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
               {prop.cover_url ? (
                 <img src={prop.cover_url} alt={prop.title} className="w-full h-36 object-cover" />
               ) : (

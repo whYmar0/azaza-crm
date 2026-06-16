@@ -26,6 +26,8 @@ func New(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	bookingsH := handlers.NewBookingsHandler(db, cfg)
 	aiH := handlers.NewAIHandler(db, cfg)
 	igH := handlers.NewInstagramHandler(db, cfg)
+	waH := handlers.NewWhatsAppHandler(db, cfg)
+	notifH := handlers.NewNotificationsHandler(db, cfg)
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
@@ -62,6 +64,8 @@ func New(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			props.GET("/:id/nearby", propsH.Nearby)
 			props.GET("/:id/match/:client_id", propsH.MatchForClient)
 			props.POST("/:id/cover", aiH.UploadCover)
+			props.POST("/:id/photos", propsH.UploadPhotos)
+			props.DELETE("/:id/photos", propsH.DeletePhoto)
 			props.POST("/:id/generate", aiH.GenerateDescription)
 			props.PUT("/:id/description", aiH.UpdateDescription)
 		}
@@ -98,15 +102,35 @@ func New(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			ig.DELETE("/disconnect", igH.Disconnect)
 			ig.GET("/stats", igH.Stats)
 		}
+
+		wa := protected.Group("/whatsapp")
+		{
+			wa.GET("", waH.GetIntegration)
+			wa.POST("/connect", waH.Connect)
+			wa.DELETE("/disconnect", waH.Disconnect)
+			wa.POST("/send", waH.SendMessage)
+		}
+
+		notifications := protected.Group("/notifications")
+		{
+			notifications.GET("", notifH.List)
+			notifications.PUT("/:id/read", notifH.MarkRead)
+			notifications.PUT("/read-all", notifH.MarkAllRead)
+		}
 	}
 
 	public := v1.Group("/public", middleware.APIKey(db))
 	{
 		public.GET("/properties", publicH.ListProperties)
 		public.GET("/properties/:id", publicH.GetProperty)
+		public.POST("/properties/import", publicH.ImportProperties)
 		public.POST("/leads", publicH.CreateLead)
-		public.GET("/selections/:token", publicH.GetSelection)
-		public.POST("/selections/:token/feedback", publicH.AddFeedback)
+	}
+
+	publicSelections := v1.Group("/public/selections")
+	{
+		publicSelections.GET("/:token", publicH.GetSelection)
+		publicSelections.POST("/:token/feedback", publicH.AddFeedback)
 	}
 
 	return r

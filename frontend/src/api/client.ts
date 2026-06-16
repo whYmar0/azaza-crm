@@ -1,6 +1,6 @@
 import type {
   Client, Deal, Interaction, MatchItem, MatchResult,
-  NearbyPlace, Property, Selection, SelectionFeedback, User,
+  NearbyPlace, Notification, Property, Selection, SelectionFeedback, User,
 } from '../types'
 
 const BASE_URL = import.meta.env.VITE_API_URL || ''
@@ -100,6 +100,21 @@ export const propertiesApi = {
       body: fd,
     }).then(r => r.json()) as Promise<{ cover_url: string }>
   },
+  uploadPhotos: (id: number, files: File[]) => {
+    const token = getToken()
+    const fd = new FormData()
+    files.forEach(f => fd.append('photos', f))
+    return fetch(`/api/v1/properties/${id}/photos`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd,
+    }).then(r => r.json()) as Promise<{ photos: string[] }>
+  },
+  deletePhoto: (id: number, url: string) =>
+    request<{ photos: string[] }>(`/api/v1/properties/${id}/photos`, {
+      method: 'DELETE',
+      body: JSON.stringify({ url }),
+    }),
   generateDescription: (id: number) =>
     request<{ description: string; tags: string[] }>(`/api/v1/properties/${id}/generate`, { method: 'POST' }),
   updateDescription: (id: number, data: { description: string; tags: string[] }) =>
@@ -134,6 +149,23 @@ export const instagramApi = {
     }),
   disconnect: () => request<{ connected: boolean }>('/api/v1/instagram/disconnect', { method: 'DELETE' }),
   stats: () => request<{ profile: Record<string, unknown>; media: Record<string, unknown>; username: string }>('/api/v1/instagram/stats'),
+}
+
+export const whatsappApi = {
+  get: () => request<{ connected: boolean; display_phone?: string; verified_name?: string }>('/api/v1/whatsapp'),
+  connect: (access_token: string, phone_number_id: string) =>
+    request<{ connected: boolean; display_phone: string; verified_name: string }>('/api/v1/whatsapp/connect', {
+      method: 'POST', body: JSON.stringify({ access_token, phone_number_id }),
+    }),
+  disconnect: () => request<{ connected: boolean }>('/api/v1/whatsapp/disconnect', { method: 'DELETE' }),
+  sendTest: (to: string, message: string) =>
+    request<{ sent: boolean }>('/api/v1/whatsapp/send', { method: 'POST', body: JSON.stringify({ to, message }) }),
+}
+
+export const notificationsApi = {
+  list: () => request<Notification[]>('/api/v1/notifications'),
+  markRead: (id: number) => request<void>(`/api/v1/notifications/${id}/read`, { method: 'PUT' }),
+  markAllRead: () => request<void>('/api/v1/notifications/read-all', { method: 'PUT' }),
 }
 
 export const geoApi = {

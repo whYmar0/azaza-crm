@@ -85,13 +85,16 @@ export default function Selections() {
                 <div className="border-t border-slate-100 pt-3">
                   <div className="text-xs font-medium text-slate-600 mb-2">Реакции клиента</div>
                   <div className="flex gap-3 flex-wrap">
-                    {sel.feedbacks!.map(fb => (
-                      <div key={fb.id} className="flex items-center gap-1.5 text-sm">
-                        <span>{fb.reaction === 'up' ? '👍' : '👎'}</span>
-                        <span className="text-slate-600">#{fb.property_id}</span>
-                        {fb.comment && <span className="text-slate-400 text-xs">— {fb.comment}</span>}
-                      </div>
-                    ))}
+                    {sel.feedbacks!.map(fb => {
+                      const p = getProp(fb.property_id)
+                      return (
+                        <div key={fb.id} className="flex items-center gap-1.5 text-sm">
+                          <span>{fb.reaction === 'up' ? '👍' : '👎'}</span>
+                          <span className="text-slate-600">{p ? p.title : `#${fb.property_id}`}</span>
+                          {fb.comment && <span className="text-slate-400 text-xs">— {fb.comment}</span>}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

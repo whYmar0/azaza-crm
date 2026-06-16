@@ -128,7 +128,7 @@ export default function InstagramPage() {
                     link: { href: 'https://developers.facebook.com/apps', label: 'developers.facebook.com/apps' },
                     sub: [
                       'Нажмите «Создать приложение» → тип: «Другое» → «Нет» → «Бизнес»',
-                      'Введите название (например: HomeMatch CRM)',
+                      'Введите название (например: Nearby CRM)',
                       'В дашборде нажмите «Добавить продукт» → найдите «Instagram Graph API» → «Настройка»',
                     ],
                   },

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { clientsApi } from '../api/client'
 import type { Client } from '../types'
 import StatusPill from '../components/StatusPill'
-import { Search, Plus, Phone } from 'lucide-react'
+import { Search, Plus, Phone, Trash2 } from 'lucide-react'
 
 const STATUS_TABS = [
   { key: '', label: 'Все' },
@@ -37,6 +37,16 @@ export default function Clients() {
     const t = setTimeout(load, 350)
     return () => clearTimeout(t)
   }, [search])
+
+  const deleteClient = async (id: number) => {
+    if (!window.confirm('Удалить этого клиента?')) return
+    try {
+      await clientsApi.delete(id)
+      setClients(prev => prev.filter(c => c.id !== id))
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Не удалось удалить клиента')
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -90,16 +100,17 @@ export default function Clients() {
               <th className="text-left px-4 py-3 font-medium text-slate-700">Бюджет</th>
               <th className="text-left px-4 py-3 font-medium text-slate-700">Пожелания</th>
               <th className="text-left px-4 py-3 font-medium text-slate-700">Статус</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">Загрузка...</td>
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">Загрузка...</td>
               </tr>
             ) : clients.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">Клиенты не найдены</td>
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">Клиенты не найдены</td>
               </tr>
             ) : (
               clients.map(client => (
@@ -130,6 +141,12 @@ export default function Clients() {
                   </td>
                   <td className="px-4 py-3">
                     <StatusPill status={client.status} type="client" />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => deleteClient(client.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               ))

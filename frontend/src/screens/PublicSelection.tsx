@@ -161,7 +161,7 @@ export default function PublicSelection() {
         </div>
 
         <div className="text-center mt-8 text-xs text-slate-400">
-          HomeMatch CRM · подбор объектов по образу жизни
+          Nearby CRM · подбор объектов по образу жизни
         </div>
       </div>
     </div>
